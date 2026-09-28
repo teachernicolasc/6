@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>El Tesoro de las Palabras - Juego de Lectura</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+    <style>
+        body {
+            font-family: 'Fredoka', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            overflow-x: hidden;
+            background-color: #4fa6ff;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* --- ANIMACIONES DEL FONDO DINÁMICO --- */
+        @keyframes waveMove {
+            0% { transform: translateX(0) translateZ(0) scaleY(1); }
+            50% { transform: translateX(-25%) translateZ(0) scaleY(0.9); }
+            100% { transform: translateX(-50%) translateZ(0) scaleY(1); }
+        }
+        @keyframes floatCloud {
+            0% { transform: translateX(-15vw); }
+            100% { transform: translateX(115vw); }
+        }
+        @keyframes spinSun {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes floatShip {
+            0%, 100% { transform: translateY(0) rotate(-2deg); }
+            50% { transform: translateY(-10px) rotate(2deg); }
+        }
+
+        .wave-layer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 200%;
+            background-repeat: repeat-x;
+            transform-origin: bottom;
+        }
+        .wave-1 { height: 22vh; animation: waveMove 12s linear infinite; opacity: 0.9; z-index: 1; }
+        .wave-2 { height: 28vh; animation: waveMove 18s linear infinite reverse; opacity: 0.6; z-index: 0; }
+        .wave-3 { height: 18vh; animation: waveMove 8s linear infinite; opacity: 1; z-index: 2; filter: drop-shadow(0 -5px 10px rgba(0,50,150,0.3)); }
+
+        .cloud {
+            position: absolute;
+            animation: floatCloud linear infinite;
+            opacity: 0.85;
+            filter: drop-shadow(0 8px 8px rgba(0,0,0,0.1));
+        }
+
+        /* --- ESTILOS DE COMPONENTES ADAPTATIVOS --- */
+        .pergamino {
+            background-color: #fcebb6;
+            background-image: url('data:image/svg+xml;utf8,<svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noise)" opacity="0.15"/></svg>');
+            border: 6px solid #8b5a2b;
+            border-radius: 16px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5), inset 0 0 40px rgba(139, 90, 43, 0.2);
+        }
+
+        .btn-pirata {
+            background: linear-gradient(to bottom, #ef4444, #b91c1c);
+            border-bottom: 5px solid #7f1d1d;
+            transition: all 0.1s;
+        }
+        .btn-pirata:active { transform: translateY(3px); border-bottom: 2px solid #7f1d1d; }
+
+        .btn-accion {
+            background: linear-gradient(to bottom, #10b981, #059669);
+            border-bottom: 5px solid #047857;
+            transition: all 0.1s;
+        }
+        .btn-accion:active { transform: translateY(3px); border-bottom: 2px solid #047857; }
+
+        .card-imagen {
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card-imagen:hover {
+            transform: scale(1.03);
+            box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.4);
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+        .anim-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+
+        @keyframes bounce-win {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px) scale(1.05); }
+        }
+        .anim-bounce { animation: bounce-win 0.6s ease-in-out; }
+
+        #ship-avatar {
+            transition: left 2s ease-in-out, top 2s ease-in-out;
+            filter: drop-shadow(2px 8px 4px rgba(0,0,0,0.5));
+        }
+
+        /* Contenedor principal adaptable con scroll fluido si es necesario */
+        .app-container {
+            width: 100%;
+            max-width: 1200px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            box-sizing: border-box;
+            position: relative;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="text-gray-800 flex flex-col items-center justify-center relative overflow-x-hidden">
+
+    <div class="fixed inset-0 z-[-1] pointer-events-none bg-gradient-to-b from-[#5ab2ff] to-[#164a85]">
+        <!-- Sol -->
+        <div class="absolute top-6 right-8 sm:top-8 sm:right-12 w-24 h-24 sm:w-32 sm:h-32 bg-yellow-300 rounded-full shadow-[0_0_60px_rgba(253,224,71,0.9)]" style="animation: spinSun 30s linear infinite;">
+            <div class="absolute inset-[-15px] border-dashed border-[8px] border-yellow-200/40 rounded-full"></div>
+        </div>
+        
+        <!-- Nubes responsivas -->
+        <svg class="cloud top-10" style="width: 120px; animation-duration: 40s; animation-delay: -15s;" viewBox="0 0 100 50">
+            <path d="M20,40 Q10,40 10,30 Q10,20 25,20 Q30,10 45,10 Q60,10 65,20 Q80,20 85,30 Q90,40 70,40 Z" fill="white" opacity="0.9"/>
+        </svg>
+        <svg class="cloud top-28" style="width: 200px; animation-duration: 55s; animation-delay: -5s;" viewBox="0 0 100 50">
+            <path d="M20,40 Q10,40 10,30 Q10,20 25,20 Q30,10 45,10 Q60,10 65,20 Q80,20 85,30 Q90,40 70,40 Z" fill="white" opacity="0.75"/>
+        </svg>
+
+        <!-- Olas dinámicas -->
+        <div class="wave-layer wave-2 bg-[url('data:image/svg+xml;utf8,<svg viewBox=\"0 0 800 150\" preserveAspectRatio=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M0,50 Q100,0 200,50 T400,50 T600,50 T800,50 L800,150 L0,150 Z\" fill=\"%231d6fa5\"/></svg>')]"></div>
+        <div class="wave-layer wave-1 bg-[url('data:image/svg+xml;utf8,<svg viewBox=\"0 0 800 150\" preserveAspectRatio=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M0,70 Q100,20 200,70 T400,70 T600,70 T800,70 L800,150 L0,150 Z\" fill=\"%23145a86\"/></svg>')]"></div>
+        <div class="absolute bottom-[18vh] left-[15%] text-5xl sm:text-6xl opacity-90" style="animation: floatShip 4s ease-in-out infinite;">⛵</div>
+        <div class="wave-layer wave-3 bg-[url('data:image/svg+xml;utf8,<svg viewBox=\"0 0 800 150\" preserveAspectRatio=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M0,90 Q100,40 200,90 T400,90 T600,90 T800,90 L800,150 L0,150 Z\" fill=\"%230b3c5d\"/></svg>')]"></div>
+    </div>
+
+    <div class="app-container">
+        
+        <!-- Pantalla de Inicio -->
+        <div id="start-screen" class="pergamino max-w-xl w-full flex flex-col items-center p-6 sm:p-10 text-center my-auto">
+            <div class="text-6xl sm:text-7xl mb-3 drop-shadow-md" style="animation: bounce-win 3s infinite;">🏴‍☠️</div>
+            <h1 class="text-3xl sm:text-5xl font-bold text-amber-900 mb-4 drop-shadow-sm">
+                El Tesoro de las Palabras
+            </h1>
+            <p class="text-lg sm:text-xl text-amber-800 mb-6 leading-relaxed font-semibold">
+                ¡Hola grumete! Lee atentamente, ordena las imágenes según la historia y navega por el mapa hasta encontrar el gran tesoro.
+            </p>
+            <button onclick="iniciarJuego()" class="btn-pirata text-white text-2xl sm:text-3xl font-bold py-4 px-10 rounded-full w-full flex items-center justify-center gap-3 shadow-xl">
+                <span>¡Zarpar ahora!</span> ⛵
+            </button>
+        </div>
+
+        <!-- Pantalla de Mapa Geográfico adaptable -->
+        <div id="map-screen" class="hidden pergamino w-full max-w-4xl flex-col items-center p-4 sm:p-6 my-auto">
+            <h2 class="text-2xl sm:text-4xl font-bold text-amber-950 mb-2 text-center">🗺️ Mapa de Navegación 🗺️</h2>
+            <p id="map-msg" class="text-lg sm:text-xl text-amber-800 font-bold mb-4 text-center">¡Iniciando la aventura!</p>
+            
+            <div class="relative w-full h-[55vh] sm:h-[450px] bg-[#fcebb6] border-4 border-amber-800/40 rounded-xl overflow-hidden shadow-inner mb-6">
+                <!-- Ruta gráfica -->
+                <svg class="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
+                    <path d="M 10 70 Q 20 35, 35 55 T 60 45 T 80 65 T 92 25" fill="none" stroke="#b45309" stroke-width="2.5" stroke-dasharray="4 4" class="opacity-70"/>
+                </svg>
+                
+                <!-- Nodos / Islas del mapa -->
+                <div id="node-0" class="absolute w-10 h-10 sm:w-14 sm:h-14 -ml-5 -mt-5 sm:-ml-7 sm:-mt-7 rounded-full border-4 border-white bg-green-500 shadow-lg flex items-center justify-center text-lg sm:text-2xl z-10 transition-all" style="left: 10%; top: 70%;">🏝️</div>
+                <div id="node-1" class="absolute w-10 h-10 sm:w-14 sm:h-14 -ml-5 -mt-5 sm:-ml-7 sm:-mt-7 rounded-full border-4 border-amber-900 bg-amber-300 shadow-lg flex items-center justify-center text-lg sm:text-2xl z-10 grayscale opacity-50 transition-all" style="left: 35%; top: 55%;">🌴</div>
+                <div id="node-2" class="absolute w-10 h-10 sm:w-14 sm:h-14 -ml-5 -mt-5 sm:-ml-7 sm:-mt-7 rounded-full border-4 border-amber-900 bg-amber-300 shadow-lg flex items-center justify-center text-lg sm:text-2xl z-10 grayscale opacity-50 transition-all" style="left: 60%; top: 45%;">⛰️</div>
+                <div id="node-3" class="absolute w-10 h-10 sm:w-14 sm:h-14 -ml-5 -mt-5 sm:-ml-7 sm:-mt-7 rounded-full border-4 border-amber-900 bg-amber-300 shadow-lg flex items-center justify-center text-lg sm:text-2xl z-10 grayscale opacity-50 transition-all" style="left: 80%; top: 65%;">💀</div>
+                <div id="node-4" class="absolute w-10 h-10 sm:w-14 sm:h-14 -ml-5 -mt-5 sm:-ml-7 sm:-mt-7 rounded-full border-4 border-amber-900 bg-amber-300 shadow-lg flex items-center justify-center text-lg sm:text-2xl z-10 grayscale opacity-50 transition-all" style="left: 88%; top: 40%;">🌋</div>
+                <div id="node-5" class="absolute w-12 h-12 sm:w-16 sm:h-16 -ml-6 -mt-6 sm:-ml-8 sm:-mt-8 rounded-full border-4 border-white bg-red-500 shadow-lg flex items-center justify-center text-2xl sm:text-3xl z-10 grayscale opacity-50 transition-all" style="left: 92%; top: 25%;">💎</div>
+
+                <!-- Avatar del Barco -->
+                <div id="ship-avatar" class="absolute text-4xl sm:text-5xl z-20 -ml-5 -mt-8 sm:-ml-6 sm:-mt-10" style="left: 10%; top: 70%;">⛵</div>
+            </div>
+
+            <button id="btn-continue-map" onclick="irAJuego()" class="btn-accion text-white text-xl sm:text-2xl font-bold py-3 px-8 sm:px-12 rounded-full shadow-lg">
+                Leer siguiente historia 📖
+            </button>
+        </div>
+
+        <!-- Pantalla de Juego Principal -->
+        <div id="game-screen" class="hidden w-full max-w-5xl flex-col items-center my-auto">
+            
+            <!-- Barra de Estado Superior -->
+            <div class="w-full flex justify-between items-center bg-blue-950/90 text-amber-100 p-3 sm:p-4 rounded-xl shadow-lg border-4 border-blue-900 mb-4 backdrop-blur-sm">
+                <div class="flex items-center gap-2 text-xl sm:text-3xl font-bold bg-amber-900/80 px-3 sm:px-5 py-1 rounded-lg">
+                    <span>💰</span>
+                    <span id="score-display">0</span>
+                </div>
+                <div class="text-lg sm:text-2xl font-bold tracking-wider bg-blue-900/80 px-3 sm:px-5 py-1 rounded-lg">
+                    Lectura <span id="level-display" class="text-yellow-300">1</span>/<span id="total-levels-display">20</span>
+                </div>
+            </div>
+
+            <!-- Área del Texto Lectura -->
+            <div class="pergamino w-full p-5 sm:p-8 mb-4 sm:mb-6 relative">
+                <div class="absolute -top-5 -left-3 sm:-top-6 sm:-left-6 text-4xl sm:text-5xl transform -rotate-12 drop-shadow-md">🦜</div>
+                <h2 class="text-xl sm:text-3xl font-bold text-amber-950 leading-relaxed text-center" id="story-text">
+                    Cargando historia...
+                </h2>
+            </div>
+
+            <!-- Casillas de Destino -->
+            <div class="w-full bg-blue-950/70 p-3 sm:p-5 rounded-2xl mb-4 sm:mb-6 shadow-inner border-4 border-blue-900/80 backdrop-blur-md">
+                <h3 class="text-white text-center text-base sm:text-xl font-bold mb-3 drop-shadow-md">Toca una imagen abajo para ordenarla aquí:</h3>
+                <div id="slots-container" class="grid grid-cols-2 sm:flex sm:flex-wrap justify-center gap-3 sm:gap-6">
+                    <!-- Dinámico -->
+                </div>
+            </div>
+
+            <!-- Piezas Disponibles -->
+            <div id="pool-container" class="grid grid-cols-2 sm:flex sm:flex-wrap justify-center gap-3 sm:gap-6 mb-6">
+                <!-- Dinámico -->
+            </div>
+
+            <!-- Botón Comprobar -->
+            <button id="btn-check" onclick="comprobarRespuesta()" class="hidden btn-accion text-white text-2xl sm:text-3xl font-bold py-3 sm:py-4 px-10 sm:px-12 rounded-full mb-4 flex items-center justify-center gap-3 w-full sm:w-auto shadow-2xl">
+                <span>¡Revisar Orden!</span> ✅
+            </button>
+
+            <!-- Mensaje Feedback -->
+            <div id="feedback-msg" class="text-xl sm:text-2xl font-bold text-center opacity-0 transition-opacity duration-300 h-10 drop-shadow-xl w-full bg-black/40 rounded-lg py-1"></div>
+        </div>
+
+        <!-- Pantalla Finalización / Victoria -->
+        <div id="end-screen" class="hidden pergamino max-w-xl w-full flex flex-col items-center p-6 sm:p-10 text-center my-auto">
+            <div class="text-7xl sm:text-8xl mb-4" style="animation: bounce-win 2s infinite;">💎</div>
+            <h1 class="text-3xl sm:text-5xl font-bold text-amber-900 mb-3 drop-shadow-md">
+                ¡Encontraste el Tesoro!
+            </h1>
+            <p class="text-xl sm:text-2xl text-amber-800 mb-6 font-bold">
+                ¡Increíble trabajo! Eres un pirata experto en lectura.
+            </p>
+            <div class="bg-amber-100 border-4 border-amber-600 rounded-xl p-5 mb-6 w-full shadow-inner">
+                <p class="text-xl font-bold text-amber-900 mb-1">Tesoro acumulado:</p>
+                <p class="text-5xl sm:text-6xl font-black text-yellow-600 flex justify-center items-center gap-2 drop-shadow-md">
+                    <span id="final-score">0</span> 💰
+                </p>
+            </div>
+            <button onclick="reiniciarJuego()" class="btn-pirata text-white text-xl sm:text-2xl font-bold py-3 sm:py-4 px-8 rounded-full w-full shadow-lg">
+                Jugar de nuevo 🔄
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Generador de escenas vectoriales optimizado para pantallas táctiles y de escritorio
+        function getSceneSVG(bgType, emoji1, emoji2 = null) {
+            let bg = '';
+            if (bgType === 'mar') {
+                bg = `<rect width="100" height="100" fill="#4fa6ff"/>
+                      <path d="M0 60 Q 25 50 50 60 T 100 60 L 100 100 L 0 100 Z" fill="#2584d4"/>
+                      <path d="M0 75 Q 25 65 50 75 T 100 75 L 100 100 L 0 100 Z" fill="#1c6ab5"/>`;
+            } else if (bgType === 'isla') {
+                bg = `<rect width="100" height="100" fill="#4fa6ff"/>
+                      <path d="M0 60 Q 50 20 100 60 L 100 100 L 0 100 Z" fill="#eab308"/>
+                      <circle cx="20" cy="20" r="12" fill="#fde047"/>`;
+            } else if (bgType === 'barco') {
+                bg = `<rect width="100" height="100" fill="#8bc34a"/>
+                      <rect x="0" y="50" width="100" height="50" fill="#78350f"/>
+                      <path d="M0 50 L 100 50" stroke="#451a03" stroke-width="4"/>`;
+            } else if (bgType === 'noche') {
+                bg = `<rect width="100" height="100" fill="#1e1b4b"/>
+                      <circle cx="80" cy="25" r="15" fill="#fef08a"/>
+                      <path d="M0 70 Q 25 60 50 70 T 100 70 L 100 100 L 0 100 Z" fill="#172554"/>`;
+            } else if (bgType === 'cueva') {
+                bg = `<rect width="100" height="100" fill="#3f3f46"/>
+                      <path d="M0 0 L 20 30 L 40 0 L 60 35 L 80 0 L 100 25 L 100 0 Z" fill="#18181b"/>
+                      <path d="M0 100 L 30 70 L 50 100 L 70 75 L 100 100 Z" fill="#18181b"/>`;
+            } else if (bgType === 'selva') {
+                bg = `<rect width="100" height="100" fill="#22c55e"/>
+                      <circle cx="20" cy="50" r="35" fill="#166534"/>
+                      <circle cx="85" cy="55" r="40" fill="#14532d"/>`;
+            } else if (bgType === 'submarino') {
+                bg = `<rect width="100" height="100" fill="#0891b2"/>
+                      <path d="M10 100 Q 20 60 5 40 Q -5 70 10 100" fill="#047857"/>`;
+            } else if (bgType === 'playa') {
+                bg = `<rect width="100" height="100" fill="#38bdf8"/>
+                      <path d="M0 50 Q 50 40 100 50 L 100 100 L 0 100 Z" fill="#fde047"/>`;
+            }
+
+            const shadow = 'style="filter: drop-shadow(2px 3px 2px rgba(0,0,0,0.6));"';
+            let emojiSVG = `<text x="50" y="55" font-size="42" text-anchor="middle" dominant-baseline="central" ${shadow}>${emoji1}</text>`;
+            if (emoji2) {
+                emojiSVG = `
+                    <text x="35" y="55" font-size="36" text-anchor="middle" dominant-baseline="central" ${shadow}>${emoji1}</text>
+                    <text x="70" y="62" font-size="32" text-anchor="middle" dominant-baseline="central" ${shadow}>${emoji2}</text>
+                `;
+            }
+
+            return `<svg viewBox="0 0 100 100" class="w-full h-3/5 object-cover rounded-t-xl border-b-2 border-amber-900/30" preserveAspectRatio="xMidYMid slice">
+                ${bg} ${emojiSVG}
+            </svg>`;
+        }
+
+        // Base de datos completa de 20 lecturas adaptadas para 2° básico
+        const niveles = [
+            {
+                text: "El pirata bajó a la playa. Cavó en la arena. Encontró una caja. Tenía mucho oro.",
+                parts: [
+                    { id: 1, bg: 'playa', emoji1: '🏴‍☠️', desc: "Llegar a la playa" },
+                    { id: 2, bg: 'playa', emoji1: '⛏️', emoji2: '📦', desc: "Cavar en arena" },
+                    { id: 3, bg: 'isla', emoji1: '📦', desc: "Encontrar caja" },
+                    { id: 4, bg: 'isla', emoji1: '💰', desc: "Ver el oro" }
+                ]
+            },
+            {
+                text: "El barco zarpó de día. Llegó la noche. Salió la luna redonda. Todos durmieron.",
+                parts: [
+                    { id: 1, bg: 'mar', emoji1: '⛵', emoji2: '☀️', desc: "Zarpar de día" },
+                    { id: 2, bg: 'noche', emoji1: '🌙', desc: "Llega la noche" },
+                    { id: 3, bg: 'noche', emoji1: '🌕', desc: "Sale la luna" },
+                    { id: 4, bg: 'barco', emoji1: '💤', emoji2: '🏴‍☠️', desc: "Todos duermen" }
+                ]
+            },
+            {
+                text: "El loro voló alto. Vio una palmera. Se comió una manzana. Volvió al barco.",
+                parts: [
+                    { id: 1, bg: 'mar', emoji1: '🦜', desc: "Volar alto" },
+                    { id: 2, bg: 'isla', emoji1: '🌴', emoji2: '🦜', desc: "Ver palmera" },
+                    { id: 3, bg: 'selva', emoji1: '🍎', emoji2: '🦜', desc: "Comer manzana" },
+                    { id: 4, bg: 'barco', emoji1: '🦜', emoji2: '⚓', desc: "Volver al barco" }
+                ]
+            },
+            {
+                text: "El niño pescó un pez. El pez saltó al agua. El niño se alegró. Un delfín saludó.",
+                parts: [
+                    { id: 1, bg: 'mar', emoji1: '👦', emoji2: '🎣', desc: "Pescar un pez" },
+                    { id: 2, bg: 'mar', emoji1: '🐟', emoji2: '💦', desc: "Pez salta al agua" },
+                    { id: 3, bg: 'barco', emoji1: '😊', desc: "Niño se alegra" },
+                    { id: 4, bg: 'mar', emoji1: '🐬', emoji2: '👋', desc: "Delfín saluda" }
+                ]
+            },
+            {
+                text: "El capitán miró el mapa. Subió rápido. Vio una gran montaña. Gritó muy fuerte.",
+                parts: [
+                    { id: 1, bg: 'barco', emoji1: '🗺️', emoji2: '👁️', desc: "Mirar mapa" },
+                    { id: 2, bg: 'barco', emoji1: '🏃', emoji2: '⬆️', desc: "Subir rápido" },
+                    { id: 3, bg: 'mar', emoji1: '⛰️', desc: "Ver la montaña" },
+                    { id: 4, bg: 'barco', emoji1: '🗣️', emoji2: '📢', desc: "Gritar fuerte" }
+                ]
+            },
+            {
+                text: "El cocinero calentó una olla. Echó pescados frescos. Puso sal y limón. Sirvió una rica sopa.",
+                parts: [
+                    { id: 1, bg: 'barco', emoji1: '👨‍🍳', emoji2: '🍲', desc: "Calentar olla" },
+                    { id: 2, bg: 'barco', emoji1: '🐟', emoji2: '❄️', desc: "Echar pescados" },
+                    { id: 3, bg: 'barco', emoji1: '🧂', emoji2: '🍋', desc: "Poner sal y limón" },
+                    { id: 4, bg: 'barco', emoji1: '🥣', emoji2: '😋', desc: "Servir sopa" }
+                ]
+            },
+            {
+                text: "El mono robó las llaves. Corrió por el barco. Se escondió en una caja. Se quedó dormido.",
+                parts: [
+                    { id: 1, bg: 'barco', emoji1: '🐵', emoji2: '🔑', desc: "Robar llaves" },
+                    { id: 2, bg: 'barco', emoji1: '🏃', emoji2: '🐵', desc: "Correr por barco" },
+                    { id: 3, bg: 'cueva', emoji1: '📦', desc: "Esconderse en caja" },
+                    { id: 4, bg: 'cueva', emoji1: '💤', emoji2: '🐵', desc: "Quedarse dormido" }
+                ]
+            },
+            {
+                text: "Vieron huellas en la arena. Caminaron a la cueva. Encendieron un fuego. Vieron un diamante.",
+                parts: [
+                    { id: 1, bg: 'playa', emoji1: '👣', desc: "Huellas en la arena" },
+                    { id: 2, bg: 'isla', emoji1: '🚶', emoji2: '⚫', desc: "Caminar a la cueva" },
+                    { id: 3, bg: 'cueva', emoji1: '🔥', desc: "Encender fuego" },
+                    { id: 4, bg: 'cueva', emoji1: '💎', emoji2: '✨', desc: "Ver diamante" }
+                ]
+            },
+            {
+                text: "Un pulpo nadó hacia el barco. Agarró el ancla pesada. El capitán le dio un pez. El pulpo se fue feliz.",
+                parts: [
+                    { id: 1, bg: 'mar', emoji1: '🐙', emoji2: '🌊', desc: "Pulpo nada al barco" },
+                    { id: 2, bg: 'submarino', emoji1: '🐙', emoji2: '⚓', desc: "Agarra el ancla" },
+                    { id: 3, bg: 'barco', emoji1: '🏴‍☠️', emoji2: '🐟', desc: "Darle un pez" },
+                    { id: 4, bg: 'mar', emoji1: '🐙', emoji2: '😊', desc: "Se va feliz" }
+                ]
+            },
+            {
+                text: "La princesa cantó una canción. Los peces bailaron. Ella dejó un anillo brillante. Luego, saltó al agua.",
+                parts: [
+                    { id: 1, bg: 'mar', emoji1: '👸', emoji2: '🎵', desc: "Princesa canta" },
+                    { id: 2, bg: 'submarino', emoji1: '🐠', emoji2: '🐟', desc: "Peces bailan" },
+                    { id: 3, bg: 'isla', emoji1: '💍', emoji2: '✨', desc: "Dejar anillo" },
+                    { id: 4, bg: 'submarino', emoji1: '👸', emoji2: '💦', desc: "Saltar al agua" }
+                ]
+            },
+            {
+                text: "Primero, limpiaron la cubierta. Luego, remendaron la vela blanca. Después, cenaron carne. Al final cantaron.",
+                parts: [
+                    { id: 1, bg: 'barco', emoji1: '🧹', emoji2: '💧', desc: "Limpiar cubierta" },
+                    { id: 2, bg: 'barco', emoji1: '🧵', emoji2: '⛵', desc: "Remendar vela" },
+                    { id: 3, bg: 'barco', emoji1: '🍖', emoji2: '🔥', desc: "Cenar carne" },
+                    { id: 4, bg: 'noche', emoji1: '🎶', emoji2: '✨', desc: "Cantar juntos" }
+                ]
+            },
+            {
+                text: "El barco navegaba tranquilo, pero llegó una gran tormenta. El viento fuerte rompió el timón. Lograron amarrar cuerdas y salvarse.",
+                parts: [
+                    { id: 1, bg: 'mar', emoji1: '⛵', emoji2: '☀️', desc: "Navegar tranquilos" },
+                    { id: 2, bg: 'noche', emoji1: '⛈️', emoji2: '🌊', desc: "Tormenta llega" },
+                    { id: 3, bg: 'barco', emoji1: '💨', emoji2: '🎡', desc: "Viento rompe timón" },
+                    { id: 4, bg: 'barco', emoji1: '🪢', emoji2: '💪', desc: "Amarrar cuerdas" }
+                ]
+            },
+            {
+                text: "La caja tenía candados. El pirata usó una llave vieja y falló. Probó una llave de oro. La caja se abrió.",
+                parts: [
+                    { id: 1, bg: 'cueva', emoji1: '📦', emoji2: '🔒', desc: "Caja con candados" },
+                    { id: 2, bg: 'cueva', emoji1: '🗝️', emoji2: '❌', desc: "Llave vieja falla" },
+                    { id: 3, bg: 'cueva', emoji1: '🤔', emoji2: '🔑', desc: "Probar llave de oro" },
+                    { id: 4, bg: 'cueva', emoji1: '✨', emoji2: '🔓', desc: "La caja se abre" }
+                ]
+            },
+            {
+                text: "Siguieron el mapa secreto. Pasaron por plantas gigantes en el agua. Esquivaron tiburones. Al final, vieron la Isla Calavera.",
+                parts: [
+                    { id: 1, bg: 'barco', emoji1: '🗺️', emoji2: '❓', desc: "Seguir el mapa" },
+                    { id: 2, bg: 'submarino', emoji1: '🌿', emoji2: '🌿', desc: "Plantas de agua" },
+                    { id: 3, bg: 'submarino', emoji1: '🦈', emoji2: '🦈', desc: "Esquivar tiburones" },
+                    { id: 4, bg: 'isla', emoji1: '☠️', emoji2: '🏝️', desc: "Ver Isla Calavera" }
+                ]
+            },
+            {
+                text: "Un fantasma salió a medianoche. Buscó su sombrero perdido. Lo encontró sobre una caja. Se despidió en la niebla.",
+                parts: [
+                    { id: 1, bg: 'noche', emoji1: '👻', emoji2: '🕛', desc: "Fantasma sale" },
+                    { id: 2, bg: 'barco', emoji1: '👻', emoji2: '🔍', desc: "Buscar sombrero" },
+                    { id: 3, bg: 'barco', emoji1: '🎩', emoji2: '📦', desc: "Hallarlo en caja" },
+                    { id: 4, bg: 'noche', emoji1: '🌫️', emoji2: '👋', desc: "Desaparecer" }
+                ]
+            },
+            {
+                text: "Bajo la luna llena, el capitán miró el papel antiguo. El barco cruzó en silencio. Esquivaron rocas grandes y echaron ancla.",
+                parts: [
+                    { id: 1, bg: 'noche', emoji1: '🌕', emoji2: '📜', desc: "Papel bajo luna" },
+                    { id: 2, bg: 'cueva', emoji1: '⛵', emoji2: '🤫', desc: "Cruzar en silencio" },
+                    { id: 3, bg: 'cueva', emoji1: '⛰️', emoji2: '⛵', desc: "Esquivar rocas" },
+                    { id: 4, bg: 'mar', emoji1: '⚓', emoji2: '🛡️', desc: "Echar ancla" }
+                ]
+            },
+            {
+                text: "La niña llegó a la selva. Cortó plantas con su machete. Descubrió un templo antiguo. Una estatua cuidaba una corona.",
+                parts: [
+                    { id: 1, bg: 'playa', emoji1: '👧', emoji2: '🌴', desc: "Llegar a selva" },
+                    { id: 2, bg: 'selva', emoji1: '🌿', emoji2: '🗡️', desc: "Cortar plantas" },
+                    { id: 3, bg: 'selva', emoji1: '🏛️', emoji2: '👁️', desc: "Descubrir templo" },
+                    { id: 4, bg: 'cueva', emoji1: '🗿', emoji2: '👑', desc: "Estatua con corona" }
+                ]
+            },
+            {
+                text: "Pájaros volaron en círculos. El marinero miró con su catalejo. Vio un barco roto en el mar y lanzaron los botes.",
+                parts: [
+                    { id: 1, bg: 'mar', emoji1: '🦅', emoji2: '🦅', desc: "Pájaros vuelan" },
+                    { id: 2, bg: 'barco', emoji1: '🔭', emoji2: '👁️', desc: "Mirar catalejo" },
+                    { id: 3, bg: 'mar', emoji1: '⛵', emoji2: '💥', desc: "Ver barco roto" },
+                    { id: 4, bg: 'barco', emoji1: '🛶', emoji2: '💦', desc: "Lanzar botes" }
+                ]
+            },
+            {
+                text: "Bailaron con música alegre. Un hombre vendió un mapa secreto. Dieron monedas por él. El mapa mostraba un volcán.",
+                parts: [
+                    { id: 1, bg: 'noche', emoji1: '🎻', emoji2: '💃', desc: "Bailar alegre" },
+                    { id: 2, bg: 'isla', emoji1: '👨', emoji2: '🗺️', desc: "Vender mapa" },
+                    { id: 3, bg: 'isla', emoji1: '💰', emoji2: '🤝', desc: "Dar monedas" },
+                    { id: 4, bg: 'isla', emoji1: '🌋', emoji2: '✨', desc: "Ver volcán" }
+                ]
+            },
+            {
+                text: "Un gran tridente de oro estaba en el fondo del mar. Un nadador bajó rápido. Resolvió el secreto y llevó el premio.",
+                parts: [
+                    { id: 1, bg: 'submarino', emoji1: '🔱', emoji2: '✨', desc: "Tridente de oro" },
+                    { id: 2, bg: 'submarino', emoji1: '🏊', emoji2: '⬇️', desc: "Nadador baja" },
+                    { id: 3, bg: 'submarino', emoji1: '🐚', emoji2: '❓', desc: "Resolver secreto" },
+                    { id: 4, bg: 'barco', emoji1: '👑', emoji2: '🎁', desc: "Llevar premio" }
+                ]
+            }
+        ];
+
+        let nivelActual = 0;
+        let puntaje = 0;
+        let piezasDisponibles = [];
+        let piezasColocadas = [null, null, null, null];
+        
+        let synthC, synthE, synthCoin, synthShip;
+        let audioInicializado = false;
+
+        const mapNodes = [
+            { id: 0, l: 10, t: 70 },
+            { id: 1, l: 35, t: 55 },
+            { id: 2, l: 60, t: 45 },
+            { id: 3, l: 80, t: 65 },
+            { id: 4, l: 88, t: 40 },
+            { id: 5, l: 92, t: 25 }
+        ];
+
+        function initAudio() {
+            if(audioInicializado) return;
+            synthC = new Tone.PolySynth(Tone.Synth).toDestination();
+            synthE = new Tone.MembraneSynth().toDestination();
+            synthCoin = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.1 } }).toDestination();
+            synthShip = new Tone.FMSynth().toDestination();
+            audioInicializado = true;
+        }
+
+        function playSonidoClick() { if(audioInicializado) synthCoin.triggerAttackRelease("C6", "16n"); }
+        function playSonidoExito() { if(audioInicializado) { const now = Tone.now(); synthC.triggerAttackRelease(["C4", "E4", "G4"], "8n", now); synthC.triggerAttackRelease(["E4", "G4", "C5"], "4n", now + 0.2); } }
+        function playSonidoError() { if(audioInicializado) synthE.triggerAttackRelease("C2", "8n"); }
+        function playSonidoNavegar() { if(audioInicializado) { const now = Tone.now(); synthShip.triggerAttackRelease("C3", "2n", now); synthShip.triggerAttackRelease("G3", "1n", now + 0.5); } }
+
+        function iniciarJuego() {
+            Tone.start(); 
+            initAudio();
+            document.getElementById('start-screen').classList.add('hidden');
+            nivelActual = 0;
+            puntaje = 0;
+            mostrarMapa(0, 0); 
+        }
+
+        function mostrarMapa(fromNodeIndex, toNodeIndex) {
+            ocultarTodo();
+            const mapScreen = document.getElementById('map-screen');
+            mapScreen.classList.remove('hidden');
+            mapScreen.classList.add('flex');
+
+            const ship = document.getElementById('ship-avatar');
+            const mapMsg = document.getElementById('map-msg');
+            const btnContinue = document.getElementById('btn-continue-map');
+
+            ship.style.transition = 'none';
+            ship.style.left = mapNodes[fromNodeIndex].l + '%';
+            ship.style.top = mapNodes[fromNodeIndex].t + '%';
+
+            for(let i=0; i<=toNodeIndex; i++) {
+                const n = document.getElementById('node-'+i);
+                if(n) {
+                    n.classList.remove('grayscale', 'opacity-50', 'border-amber-900', 'bg-amber-300');
+                    if(i === 5) {
+                        n.classList.add('border-white', 'bg-red-500', 'scale-110');
+                    } else if (i > 0) {
+                        n.classList.add('border-white', 'bg-green-400');
+                    }
+                }
+            }
+
+            if (fromNodeIndex !== toNodeIndex) {
+                mapMsg.innerText = "¡Zarpando hacia la siguiente isla!";
+                btnContinue.classList.add('hidden');
+                
+                setTimeout(() => {
+                    playSonidoNavegar();
+                    ship.style.transition = 'left 2s ease-in-out, top 2s ease-in-out';
+                    ship.style.left = mapNodes[toNodeIndex].l + '%';
+                    ship.style.top = mapNodes[toNodeIndex].t + '%';
+                    
+                    setTimeout(() => {
+                        if(toNodeIndex === 5) {
+                            mapMsg.innerText = "¡Llegamos al Tesoro!";
+                            setTimeout(mostrarFinJuego, 1500);
+                        } else {
+                            mapMsg.innerText = "¡Isla alcanzada con éxito!";
+                            btnContinue.classList.remove('hidden');
+                        }
+                    }, 2200);
+                }, 500);
+            } else {
+                mapMsg.innerText = "Revisa tu mapa y continúa la aventura.";
+                btnContinue.classList.remove('hidden');
+            }
+        }
+
+        function ocultarTodo() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('map-screen').classList.add('hidden');
+            document.getElementById('map-screen').classList.remove('flex');
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('flex');
+            document.getElementById('end-screen').classList.add('hidden');
+            document.getElementById('end-screen').classList.remove('flex');
+        }
+
+        function irAJuego() {
+            ocultarTodo();
+            const gameScreen = document.getElementById('game-screen');
+            gameScreen.classList.remove('hidden');
+            gameScreen.classList.add('flex');
+            
+            document.getElementById('total-levels-display').innerText = niveles.length;
+            actualizarPuntaje();
+            cargarNivel(nivelActual);
+        }
+
+        function actualizarPuntaje() {
+            document.getElementById('score-display').innerText = puntaje;
+            const scoreEl = document.getElementById('score-display');
+            scoreEl.classList.add('text-yellow-300', 'scale-110', 'transition-transform');
+            setTimeout(() => scoreEl.classList.remove('text-yellow-300', 'scale-110'), 300);
+        }
+
+        function mezclarArray(array) {
+            let currentIndex = array.length, randomIndex;
+            while (currentIndex != 0) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+            return array;
+        }
+
+        function cargarNivel(index) {
+            const nivel = niveles[index];
+            document.getElementById('level-display').innerText = index + 1;
+            document.getElementById('story-text').innerText = nivel.text;
+            
+            piezasColocadas = [null, null, null, null];
+            piezasDisponibles = JSON.parse(JSON.stringify(nivel.parts));
+            mezclarArray(piezasDisponibles);
+            
+            document.getElementById('btn-check').classList.add('hidden');
+            document.getElementById('feedback-msg').style.opacity = '0';
+            
+            renderizarCasillas();
+            renderizarPool();
+        }
+
+        function renderizarCasillas() {
+            const container = document.getElementById('slots-container');
+            container.innerHTML = '';
+            
+            piezasColocadas.forEach((pieza, i) => {
+                const slotDiv = document.createElement('div');
+                slotDiv.className = 'w-full sm:w-36 md:w-40 h-44 sm:h-56 rounded-xl border-4 flex flex-col items-center justify-between relative bg-blue-950/40 text-center overflow-hidden transition-all';
+                
+                if (pieza === null) {
+                    slotDiv.classList.add('border-blue-300/40', 'border-dashed', 'justify-center');
+                    slotDiv.innerHTML = `<span class="text-blue-200/40 text-3xl sm:text-4xl font-bold">${i + 1}</span>`;
+                } else {
+                    slotDiv.classList.add('border-amber-400', 'bg-white', 'border-solid', 'card-imagen');
+                    slotDiv.innerHTML = `
+                        ${getSceneSVG(pieza.bg, pieza.emoji1, pieza.emoji2)}
+                        <div class="h-2/5 w-full bg-white flex items-center justify-center p-1 sm:p-2 border-t-2 border-amber-200">
+                            <span class="text-xs sm:text-sm font-bold text-amber-900 leading-tight">${pieza.desc}</span>
+                        </div>
+                        <div class="absolute -top-1 -left-1 sm:-top-2 sm:-left-2 bg-amber-500 text-white rounded-full w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center font-bold text-xs sm:text-sm border-2 border-amber-800 shadow-md z-10">${i + 1}</div>
+                    `;
+                    slotDiv.onclick = () => moverAPool(i);
+                }
+                container.appendChild(slotDiv);
+            });
+            verificarBotonComprobar();
+        }
+
+        function renderizarPool() {
+            const container = document.getElementById('pool-container');
+            container.innerHTML = '';
+            
+            piezasDisponibles.forEach((pieza, arrayIndex) => {
+                const poolDiv = document.createElement('div');
+                poolDiv.className = 'w-full sm:w-36 md:w-40 h-44 sm:h-56 bg-white border-4 border-amber-600 rounded-xl flex flex-col items-center justify-between shadow-lg card-imagen overflow-hidden text-center cursor-pointer';
+                poolDiv.innerHTML = `
+                    ${getSceneSVG(pieza.bg, pieza.emoji1, pieza.emoji2)}
+                    <div class="h-2/5 w-full bg-white flex items-center justify-center p-1 sm:p-2 border-t-2 border-amber-200">
+                        <span class="text-xs sm:text-sm font-bold text-amber-900 leading-tight">${pieza.desc}</span>
+                    </div>
+                `;
+                poolDiv.onclick = () => moverACasilla(arrayIndex);
+                container.appendChild(poolDiv);
+            });
+        }
+
+        function moverACasilla(poolIndex) {
+            playSonidoClick();
+            const primerVacio = piezasColocadas.findIndex(p => p === null);
+            if (primerVacio !== -1) {
+                piezasColocadas[primerVacio] = piezasDisponibles.splice(poolIndex, 1)[0];
+                renderizarPool();
+                renderizarCasillas();
+            }
+        }
+
+        function moverAPool(slotIndex) {
+            playSonidoClick();
+            piezasDisponibles.push(piezasColocadas[slotIndex]);
+            piezasColocadas[slotIndex] = null;
+            renderizarPool();
+            renderizarCasillas();
+        }
+
+        function verificarBotonComprobar() {
+            const boton = document.getElementById('btn-check');
+            if (!piezasColocadas.includes(null)) {
+                boton.classList.remove('hidden');
+            } else {
+                boton.classList.add('hidden');
+            }
+        }
+
+        function comprobarRespuesta() {
+            let esCorrecto = true;
+            for (let i = 0; i < 4; i++) {
+                if (piezasColocadas[i].id !== (i + 1)) {
+                    esCorrecto = false;
+                    break;
+                }
+            }
+
+            const feedback = document.getElementById('feedback-msg');
+            const slotsContainer = document.getElementById('slots-container');
+
+            if (esCorrecto) {
+                playSonidoExito();
+                puntaje += 100;
+                actualizarPuntaje();
+                
+                feedback.innerText = "¡Excelente! +100 Monedas 💰";
+                feedback.className = "text-xl sm:text-2xl font-bold text-center text-green-300 transition-opacity duration-300 h-10 drop-shadow-xl w-full bg-green-950/80 rounded-lg py-1";
+                feedback.style.opacity = '1';
+                
+                slotsContainer.classList.add('anim-bounce');
+                document.getElementById('btn-check').classList.add('hidden'); 
+
+                setTimeout(() => {
+                    slotsContainer.classList.remove('anim-bounce');
+                    procesarSiguientePaso();
+                }, 1800);
+
+            } else {
+                playSonidoError();
+                puntaje = Math.max(0, puntaje - 10);
+                actualizarPuntaje();
+                
+                feedback.innerText = "¡Cuidado! Orden incorrecto (-10 monedas)";
+                feedback.className = "text-xl sm:text-2xl font-bold text-center text-red-300 transition-opacity duration-300 h-10 drop-shadow-xl w-full bg-red-950/80 rounded-lg py-1";
+                feedback.style.opacity = '1';
+                
+                slotsContainer.classList.add('anim-shake');
+                setTimeout(() => slotsContainer.classList.remove('anim-shake'), 400);
+            }
+        }
+
+        function procesarSiguientePaso() {
+            nivelActual++;
+            
+            if (nivelActual >= niveles.length) {
+                mostrarMapa(4, 5);
+                return;
+            }
+
+            if (nivelActual % 4 === 0) {
+                const fromNode = (nivelActual / 4) - 1;
+                const toNode = (nivelActual / 4);
+                mostrarMapa(fromNode, toNode);
+            } else {
+                irAJuego();
+            }
+        }
+
+        function mostrarFinJuego() {
+            ocultarTodo();
+            const endScreen = document.getElementById('end-screen');
+            endScreen.classList.remove('hidden');
+            endScreen.classList.add('flex');
+            
+            document.getElementById('final-score').innerText = puntaje;
+            
+            if(audioInicializado){
+                const now = Tone.now();
+                synthC.triggerAttackRelease(["C4", "E4", "G4", "C5"], "2n", now);
+                synthC.triggerAttackRelease(["E4", "G4", "C5", "E5"], "2n", now + 0.4);
+            }
+        }
+
+        function reiniciarJuego() {
+            for(let i=1; i<=5; i++) {
+                const n = document.getElementById('node-'+i);
+                if(n) {
+                    n.classList.add('grayscale', 'opacity-50', 'border-amber-900', 'bg-amber-300');
+                    n.classList.remove('border-white', 'bg-red-500', 'bg-green-400', 'scale-110');
+                    if (i===5) n.classList.add('bg-red-500');
+                }
+            }
+            iniciarJuego();
+        }
+    </script>
+</body>
+</html>
